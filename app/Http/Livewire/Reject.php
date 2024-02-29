@@ -5,8 +5,6 @@ namespace App\Http\Livewire;
 use Livewire\Component;
 use Illuminate\Session\SessionManager;
 use App\Models\SignalBit\Reject as RejectModel;
-use App\Models\SignalBit\Rft;
-use App\Models\SignalBit\EndlineOutput;
 use Carbon\Carbon;
 use DB;
 
@@ -85,45 +83,32 @@ class Reject extends Component
     {
         $validatedData = $this->validate();
 
-        $endlineOutputData = EndlineOutput::selectRaw("output_rfts.*")->leftJoin("master_plan", "master_plan.id", "=", "output_rfts.master_plan_id")->where("id_ws", $this->orderInfo->id_ws)->where("color", $this->orderInfo->color)->where("so_det_id", $this->sizeInput)->count();
-        $currentOutputData = Rft::selectRaw("output_rfts_packing.*")->leftJoin("master_plan", "master_plan.id", "=", "output_rfts_packing.master_plan_id")->where('id_ws', $this->orderInfo->id_ws)->where("color", $this->orderInfo->color)->where("so_det_id", $this->sizeInput)->count();
-        $balanceOutputData = $endlineOutputData-$currentOutputData;
-
-        $additionalMessage = $balanceOutputData < $this->outputInput && $balanceOutputData > 0 ? "<b>".($this->outputInput - $balanceOutputData)."</b> output melebihi batas input." : null;
-        if ($balanceOutputData < $this->outputInput) {
-            $this->outputInput = $balanceOutputData;
+        $insertData = [];
+        for ($i = 0; $i < $this->outputInput; $i++)
+        {
+            array_push($insertData, [
+                'master_plan_id' => $this->orderInfo->id,
+                'so_det_id' => $this->sizeInput,
+                'status' => 'NORMAL',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ]);
         }
 
-        $insertData = [];
-        if ($this->outputInput > 0) {
-            for ($i = 0; $i < $this->outputInput; $i++)
-            {
-                array_push($insertData, [
-                    'master_plan_id' => $this->orderInfo->id,
-                    'so_det_id' => $this->sizeInput,
-                    'status' => 'NORMAL',
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now()
-                ]);
-            }
+        $insertReject = RejectModel::insert($insertData);
 
-            $insertReject = RejectModel::insert($insertData);
+        if ($insertReject) {
+            $getSize = DB::table('so_det')
+                ->select('id', 'size')
+                ->where('id', $this->sizeInput)
+                ->first();
 
-            if ($insertReject) {
-                $getSize = DB::table('so_det')
-                    ->select('id', 'size')
-                    ->where('id', $this->sizeInput)
-                    ->first();
+            $this->emit('alert', 'success', $this->outputInput." REJECT output berukuran ".$getSize->size." berhasil terekam.");
 
-                $this->emit('alert', 'success', $this->outputInput." REJECT output berukuran ".$getSize->size." berhasil terekam.");
-
-                $this->outputInput = 1;
-                $this->sizeInput = '';
-            } else {
-                $this->emit('alert', 'error', "Terjadi kesalahan. Output tidak berhasil direkam.");
-            }
+            $this->outputInput = 1;
+            $this->sizeInput = '';
         } else {
-            $this->emit('alert', 'error', "Output packing-line tidak bisa melebihi endline.");
+            $this->emit('alert', 'error', "Terjadi kesalahan. Output tidak berhasil direkam.");
         }
     }
 

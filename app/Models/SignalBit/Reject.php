@@ -11,7 +11,7 @@ class Reject extends Model
 
     protected $connection = 'mysql_sb';
 
-    protected $table = 'output_rejects_packing';
+    protected $table = 'output_rejects_finish';
 
     protected $fillable = [
         'id',

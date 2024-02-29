@@ -11,7 +11,7 @@ class Rework extends Model
 
     protected $connection = 'mysql_sb';
 
-    protected $table = 'output_reworks_packing';
+    protected $table = 'output_reworks_finish';
 
     protected $fillable = [
         'id',

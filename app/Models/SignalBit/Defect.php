@@ -11,7 +11,7 @@ class Defect extends Model
 
     protected $connection = 'mysql_sb';
 
-    protected $table = 'output_defects_packing';
+    protected $table = 'output_defects_finish';
 
     protected $fillable = [
         'id',

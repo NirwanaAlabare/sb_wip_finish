@@ -11,7 +11,7 @@ class Undo extends Model
 
     protected $connection = 'mysql_sb';
 
-    protected $table = 'output_undo_packing';
+    protected $table = 'output_undo_finish';
 
     protected $fillable = [
         'id',
