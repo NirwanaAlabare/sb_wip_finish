@@ -4,6 +4,9 @@ namespace App\Http\Livewire;
 
 use Livewire\Component;
 use Illuminate\Session\SessionManager;
+use App\Models\SignalBit\EndlineOutput;
+use App\Models\SignalBit\Rft;
+use App\Models\SignalBit\Defect;
 use App\Models\SignalBit\Reject as RejectModel;
 use Carbon\Carbon;
 use DB;
@@ -83,32 +86,53 @@ class Reject extends Component
     {
         $validatedData = $this->validate();
 
-        $insertData = [];
-        for ($i = 0; $i < $this->outputInput; $i++)
-        {
-            array_push($insertData, [
-                'master_plan_id' => $this->orderInfo->id,
-                'so_det_id' => $this->sizeInput,
-                'status' => 'NORMAL',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
-            ]);
+        $endlineOutputData = EndlineOutput::selectRaw("output_rfts.*")->leftJoin("master_plan", "master_plan.id", "=", "output_rfts.master_plan_id")->where("id_ws", $this->orderInfo->id_ws)->where("color", $this->orderInfo->color)->where("so_det_id", $this->sizeInput)->count();
+        $currentRftData = Rft::selectRaw("output_rfts_finish.*")->leftJoin("master_plan", "master_plan.id", "=", "output_rfts_finish.master_plan_id")->where('id_ws', $this->orderInfo->id_ws)->where("color", $this->orderInfo->color)->where("so_det_id", $this->sizeInput)->count();
+        $currentDefectData = Defect::selectRaw("output_defects_finish.*")->leftJoin("master_plan", "master_plan.id", "=", "output_defects_finish.master_plan_id")->where('id_ws', $this->orderInfo->id_ws)->where("color", $this->orderInfo->color)->where("so_det_id", $this->sizeInput)->where("defect_status", "defect")->count();
+        $currentRejectData = RejectModel::selectRaw("output_rejects_finish.*")->leftJoin("master_plan", "master_plan.id", "=", "output_rejects_finish.master_plan_id")->where('id_ws', $this->orderInfo->id_ws)->where("color", $this->orderInfo->color)->where("so_det_id", $this->sizeInput)->count();
+        $currentOutputData = $currentRftData+$currentDefectData+$currentRejectData;
+        $balanceOutputData = $endlineOutputData-$currentOutputData;
+
+        $additionalMessage = $balanceOutputData < $this->outputInput && $balanceOutputData > 0 ? "<b>".($this->outputInput - $balanceOutputData)."</b> output melebihi batas input." : null;
+        if ($balanceOutputData < $this->outputInput) {
+            $this->outputInput = $balanceOutputData;
         }
 
-        $insertReject = RejectModel::insert($insertData);
+        $additionalMessage = $balanceOutputData < $this->outputInput && $balanceOutputData > 0 ? "<b>".($this->outputInput - $balanceOutputData)."</b> output melebihi batas input." : null;
+        if ($balanceOutputData < $this->outputInput) {
+            $this->outputInput = $balanceOutputData;
+        }
 
-        if ($insertReject) {
-            $getSize = DB::table('so_det')
-                ->select('id', 'size')
-                ->where('id', $this->sizeInput)
-                ->first();
+        $insertData = [];
+        if ($this->outputInput > 0) {
+            for ($i = 0; $i < $this->outputInput; $i++)
+            {
+                array_push($insertData, [
+                    'master_plan_id' => $this->orderInfo->id,
+                    'so_det_id' => $this->sizeInput,
+                    'status' => 'NORMAL',
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now()
+                ]);
+            }
 
-            $this->emit('alert', 'success', $this->outputInput." REJECT output berukuran ".$getSize->size." berhasil terekam.");
+            $insertReject = RejectModel::insert($insertData);
 
-            $this->outputInput = 1;
-            $this->sizeInput = '';
+            if ($insertReject) {
+                $getSize = DB::table('so_det')
+                    ->select('id', 'size')
+                    ->where('id', $this->sizeInput)
+                    ->first();
+
+                $this->emit('alert', 'success', $this->outputInput." REJECT output berukuran ".$getSize->size." berhasil terekam.");
+
+                $this->outputInput = 1;
+                $this->sizeInput = '';
+            } else {
+                $this->emit('alert', 'error', "Terjadi kesalahan. Output tidak berhasil direkam.");
+            }
         } else {
-            $this->emit('alert', 'error', "Terjadi kesalahan. Output tidak berhasil direkam.");
+            $this->emit('alert', 'error', "Output finish-line tidak bisa melebihi endline.");
         }
     }
 
